@@ -1,0 +1,109 @@
+# The watch's updates put on the website, where the Cobalt app looks for them. Once an
+# image has been tried and confirmed on a watch, `publish_update.py <build> --channel dev
+# --notes "..." --release` opens a DRAFT release, tagged watch-<channel>-<version>, its ZIP
+# attached. Publishing that draft is the maintainers' approval: this workflow then checks the
+# ZIP (both variants, the project's key), updates the manifest the website serves, and puts
+# both in public_html/firmware of cobalt-watch.com over SFTP. Nothing is built here: the
+# images are signed on the maintainers' bench, whose key never leaves it.
+#
+# Set by the maintainers in the repository's settings: the secrets HOSTINGER_HOST (the address
+# of the host's SSH access), HOSTINGER_USER, HOSTINGER_SSH_KEY (the private half of an RSA key
+# made for this workflow, its public half added on the host, which refused an ed25519 one).
+# Variables: HOSTINGER_KNOWN_HOSTS (ssh-keyscan -p 65002 <host>, pinned: no key taken on
+# trust), HOSTINGER_PORT (65002 by default), HOSTINGER_FIRMWARE_DIR (the folder, from the SFTP
+# home).
+
+name: Site
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release to put on the website (watch-dev-... or watch-produit-...)"
+        required: true
+
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    # Only the watch's releases go to the website
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'watch-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: The release's ZIP and notes
+        run: |
+          case "$TAG" in
+            watch-dev-*) channel=dev ;;
+            watch-produit-*) channel=produit ;;
+            *) echo "::error::$TAG is not a watch release (watch-dev-... or watch-produit-...)"; exit 1 ;;
+          esac
+          version="${TAG#watch-$channel-}"
+          mkdir -p release
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "cb91ai-watch-$channel-$version.zip" --dir release
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > release/notes.txt
+          echo "CHANNEL=$channel" >> "$GITHUB_ENV"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "ZIP=cb91ai-watch-$channel-$version.zip" >> "$GITHUB_ENV"
+
+      - name: Checked, and the website's manifest updated
+        run: >-
+          python3 firmware/tools/publish_update.py --zip "release/$ZIP" --channel "$CHANNEL"
+          --notes-file release/notes.txt -o out
+
+      - name: Put on the website over SFTP (the ZIP first, the manifest last)
+        env:
+          HOST: ${{ secrets.HOSTINGER_HOST }}
+          USER: ${{ secrets.HOSTINGER_USER }}
+          KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          KNOWN: ${{ vars.HOSTINGER_KNOWN_HOSTS }}
+          PORT: ${{ vars.HOSTINGER_PORT || '65002' }}
+          DIR: ${{ vars.HOSTINGER_FIRMWARE_DIR || 'domains/cobalt-watch.com/public_html/firmware' }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$USER" ] || [ -z "$KEY" ] || [ -z "$KNOWN" ]; then
+            echo "::error::HOSTINGER_HOST, HOSTINGER_USER, HOSTINGER_SSH_KEY or HOSTINGER_KNOWN_HOSTS missing (the repository's secrets and variables)"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          # A key pasted from Windows may end its lines with CR, which OpenSSH refuses
+          printf '%s\n' "$KEY" | tr -d '\r' > ~/.ssh/site_key
+          chmod 600 ~/.ssh/site_key
+          printf '%s\n' "$KNOWN" | tr -d '\r' > ~/.ssh/known_hosts
+          # The app never reads a manifest whose ZIP is not there yet: the manifest goes last
+          printf 'cd %s\nput %s\nput .htaccess\nput manifest.json\n' "$DIR" "$ZIP" > batch
+          cd out
+          sftp -b ../batch -i ~/.ssh/site_key -P "$PORT" \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o BatchMode=yes \
+            "$USER@$HOST"
+          rm -f ~/.ssh/site_key
+
+      - name: Served by the website, as sent
+        run: |
+          curl -fsS -H 'Cache-Control: no-cache' "https://cobalt-watch.com/firmware/manifest.json?t=$(date +%s)" -o served.json
+          python3 - <<'EOF'
+          import json
+          served = json.load(open("served.json", encoding="utf-8"))
+          sent = json.load(open("out/manifest.json", encoding="utf-8"))
+          assert served == sent, f"the website serves another manifest:\n{served}"
+          EOF
+          curl -fsS "https://cobalt-watch.com/firmware/$ZIP" -o served.zip
+          sha=$(sha256sum served.zip | cut -d' ' -f1)
+          want=$(python3 -c "import json; print(json.load(open('out/manifest.json'))['channels']['$CHANNEL']['sha256'])")
+          test "$sha" = "$want"
+          {
+            echo "### $CHANNEL : $VERSION sur cobalt-watch.com/firmware"
+            echo ""
+            echo "ZIP \`$ZIP\`, SHA-256 \`$sha\`, servi et vérifié ; l'app Cobalt la proposera à sa prochaine lecture du manifeste."
+          } >> "$GITHUB_STEP_SUMMARY"
