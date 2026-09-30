@@ -1,0 +1,16 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+
+description: Bosch BMA400 ultra-low-power 3-axis accelerometer on I2C (no in-tree driver yet)
+
+compatible: "bosch,bma400"
+
+include: i2c-device.yaml
+
+properties:
+  int1-gpios:
+    type: phandle-array
+    description: INT1 output of the sensor
+  int2-gpios:
+    type: phandle-array
+    description: INT2 output of the sensor

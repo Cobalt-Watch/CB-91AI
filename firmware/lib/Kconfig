@@ -1,0 +1,137 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+#
+# Shared library of the CB-91AI (lot D1). These options say what an application
+# links; its own behaviour stays in its own Kconfig.
+
+menu "CB-91AI shared library"
+
+config CB91AI_LIB_LCD
+	bool "LCD driver (BU97930 and the F-91W glass)"
+	help
+	  lcd.c: framebuffer, segment tables of the glass, bias mode, software
+	  standby of the driver. Says nothing about what to display.
+
+if CB91AI_LIB_LCD
+
+config CB91AI_LCD_GLASS_COM2_ON_COM0
+	bool "Glass COM2 plot bridged to the driver COM0 output (V1 rework)"
+	default y
+	help
+	  On the V1 board the third COM plot of the F-91W glass (plot 9) is
+	  wired to the driver SEG2 output. The rework of V2-31 bridges plot 9
+	  to plot 6 (driver COM0) and cuts the SEG2 trace, and the Sensor Watch
+	  COM2 pixels are then written to driver COM0. Every V1 board in use
+	  carries this rework (and the DEC4-DEC6 wire of V2-32), hence the
+	  default; set to n for an untouched V1 board.
+	  `cb91ai lcd com2 on|off` toggles it at run time.
+
+endif # CB91AI_LIB_LCD
+
+config CB91AI_LIB_MIC
+	bool "PDM microphone capture"
+	help
+	  mic.c: supply, PDM at 16 kHz, high-pass of the capture path, gain.
+
+if CB91AI_LIB_MIC
+
+config CB91AI_MIC_GAIN_DB
+	int "Microphone gain around the default of the PDM peripheral, in dB"
+	range -20 20
+	default 0
+	help
+	  Starting value of mic_set_gain_db(), `cb91ai mic gain <dB>` at run
+	  time. Measured on the bare V1 board on 2026-09-20: at +6 dB a loud voice
+	  10 to 15 cm away clips, while a quiet one at 30 cm peaks 27 dB below
+	  full scale, 30 dB between the two. A low level costs nothing with a
+	  floating-point codec and clipping cannot be undone: keep 0 until the
+	  level is known with the board in its case.
+
+config CB91AI_MIC_HIGH_PASS_HZ
+	int "Corner frequency of the high-pass of the capture path, in Hz"
+	range 10 300
+	default 50
+	help
+	  The output of the microphone drifts for more than three seconds after
+	  power-up; a first-order high-pass at 50 Hz brings the first half second
+	  of a capture back to the noise floor (lib/mic.c).
+
+endif # CB91AI_LIB_MIC
+
+config CB91AI_LIB_ACCEL
+	bool "BMA400 accelerometer"
+	help
+	  accel.c: reading, temperature, and later the wake-up interrupts.
+
+config CB91AI_LIB_CLOCK
+	bool "Wall clock corrected for the crystal, kept across resets"
+	help
+	  clock.c: UTC anchored on the uptime, correction in ppb, automatic
+	  calibration on a host time, time kept in retained RAM across a reset,
+	  12 or 24 hour display.
+
+if CB91AI_LIB_CLOCK
+
+config CB91AI_CLOCK_DEFAULT_PPB
+	int "Default error of the 32.768 kHz crystal, in parts per billion"
+	default 0
+	range -1000000 1000000
+	help
+	  Positive when the crystal runs fast. Starting value of the wall clock
+	  correction (lib/clock.c) until the watch has calibrated itself on the
+	  time settings of its host. Measured with firmware/tools/lfxo_drift.py;
+	  the V1 boards share the same undersized load capacitors (V2-02), so
+	  one value suits them all within the +/-20 ppm of the crystals.
+
+config CB91AI_CLOCK_24H
+	bool "24-hour display by default"
+	default n
+	help
+	  Default format of the displayed time, until the user picks one (stored
+	  in the settings, `cb91ai time format 12|24`, later the phone app).
+	  12-hour on the V1 board: the plot that carries segments A, D, E and F
+	  of the hour tens (glass SEG18) cannot be driven there (V2-31), so that
+	  position only shows "1" or nothing, which is all a 12-hour clock asks
+	  of it; "2" for 20 to 23 h cannot be drawn. Set to y for the V2 board.
+
+endif # CB91AI_LIB_CLOCK
+
+config CB91AI_LIB_GESTURE
+	bool "Gestures of the case buttons"
+	help
+	  gesture.c (lot D3): debounce, clicks, long press and chords of the
+	  buttons as a pure state machine, with the timings of the V1 (EF-17).
+	  No Zephyr inside: firmware/tests/host builds it for the PC. Says
+	  nothing about what a gesture does.
+
+config CB91AI_LIB_CALENDAR
+	bool "Civil calendar"
+	help
+	  calendar.c: milliseconds since 1970 to date and time and back, in
+	  pure C, checked on the PC against the C library of the host on every
+	  day from 1900 to 2200 (firmware/tests/host).
+
+config CB91AI_LIB_VAD
+	bool "Voice activity: the end of a take after 3 s without speech"
+	help
+	  vad.c (lot E1): the level of each 10 ms frame against a noise floor
+	  that rises 1 dB a second, runs of loud frames as speech, in pure C
+	  without floating point, checked on the PC on made-up signals and on
+	  the sentences of K1 (firmware/tests/host/test_vad.c).
+
+config CB91AI_LIB_NOTE
+	bool "The voice note container v2"
+	help
+	  note.c (lot E1): the header of 64 bytes of the Cobalt Link specification
+	  section 4 written and read byte for byte, the CRC32 of IEEE 802.3
+	  and its combination, in pure C, checked on the PC.
+
+config CB91AI_LIB_LINK_PROTO
+	bool "Messages of the Cobalt Link service"
+	help
+	  link_proto.c (lot D6): the messages of the Cobalt Link specification
+	  section 3.1, written and parsed byte for byte, in pure C, checked
+	  on the PC against the vectors that the PC harness checks too
+	  (firmware/tests/vectors/link_v1.txt).
+
+endmenu

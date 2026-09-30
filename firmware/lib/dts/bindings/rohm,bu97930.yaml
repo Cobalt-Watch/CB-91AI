@@ -1,0 +1,8 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+
+description: ROHM BU97930 segment LCD driver, 3-wire write-only SPI (CSB, SCL, SD)
+
+compatible: "rohm,bu97930"
+
+include: spi-device.yaml

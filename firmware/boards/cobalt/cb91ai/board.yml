@@ -1,0 +1,6 @@
+board:
+  name: cb91ai
+  full_name: COBALT CB-91AI
+  vendor: cobalt
+  socs:
+    - name: nrf52840

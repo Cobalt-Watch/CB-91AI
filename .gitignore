@@ -1,0 +1,13 @@
+# Build outputs and logs of the bench
+build/
+firmware/build/
+firmware/buildw/
+firmware/buildr/
+firmware/logs/
+firmware/tests/host/build/
+
+# Signing keys never live in a repository
+*.pem
+
+**/__pycache__/
+*.pyc

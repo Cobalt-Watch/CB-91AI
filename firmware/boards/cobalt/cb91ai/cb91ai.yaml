@@ -1,0 +1,19 @@
+identifier: cb91ai
+name: COBALT CB-91AI (nRF52840)
+type: mcu
+arch: arm
+ram: 256
+flash: 1024
+toolchain:
+  - zephyr
+  - gnuarmemb
+supported:
+  - adc
+  - ble
+  - gpio
+  - i2c
+  - pwm
+  - qspi
+  - spi
+  - usb_device
+vendor: cobalt

@@ -1,0 +1,115 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+#
+# Behaviour of the watch application. The drivers it links are chosen in
+# firmware/lib/Kconfig.
+
+config CB91AI_WATCH_DISPLAY_SECONDS
+	int "How long the display stays lit after a wake-up, in seconds"
+	default 10
+	range 1 15
+	help
+	  EF-44: the display is the first item of the energy budget, so it is
+	  lit on demand and goes back to standby by itself.
+
+config CB91AI_WATCH_ADV_ALWAYS
+	bool "Advertise all the time, slowly (development)"
+	help
+	  In Cobalt Link, the product keeps its radio
+	  silent and advertises for a reason only (a note, a sync by hand).
+	  The development build advertises for good, fast for 30 s after
+	  boot, a disconnection or a call, slow (1 s) otherwise, as the
+	  self-test does: the PC then always finds a sealed watch.
+
+config CB91AI_WATCH_LINK_OPEN
+	bool "Cobalt Link without pairing (development)"
+	help
+	  The service is meant for an encrypted, authenticated link only
+	  (the Cobalt Link specification). Until the pairing of phase
+	  S exists, the development build opens it, as SMP is open.
+
+config CB91AI_WATCH_DEBUG_SERVICE
+	bool "Debug service: status line and time (development)"
+	help
+	  The status line and the time characteristic of the self-test, with
+	  its UUIDs, so that ble_update.py and cobalt_time.py work on the
+	  watch as they are (src/debug.c).
+
+config CB91AI_WATCH_DEBUG_TAKE
+	bool "Takes started by the PC harness (development)"
+	help
+	  Cobalt Link key 0x7F: a take of a set length, without the voice
+	  detector, as if ALARM had been held, so that the harness checks the
+	  whole chain on a sealed watch, a hundred notes in a row
+	  (tools/cobalt_link.py hundred). Never in the product.
+
+config CB91AI_WATCH_DEBUG_JOURNAL
+	bool "The journal's period set by the PC harness (development)"
+	help
+	  Cobalt Link key 0x7D: the period of the journal of the temperature
+	  and the cell (lot T1), 1 to 600 s until the next boot, so that the
+	  harness fills pages and sectors in minutes
+	  (tools/cobalt_link.py --period 5 journal). Never in the product.
+
+config CB91AI_WATCH_DEBUG_DAILY
+	bool "The daily call's period set by the PC harness (development)"
+	help
+	  Cobalt Link key 0x7E: the period of the daily call (the watch calls
+	  the phone after a day without any contact), 60 to 86400 s until the
+	  next boot, so that the harness sees it come in minutes
+	  (tools/cobalt_link.py --daily 60 daily). Never in the product.
+
+config CB91AI_WATCH_DEBUG_TRIAL
+	bool "The trial of the calls (development, lot N1a)"
+	depends on CB91AI_WATCH_ADV_ALWAYS
+	help
+	  Cobalt Link key 0x7A: for a time the phone or the harness sets, the
+	  radio behaves as the product's, silent between its calls, and the
+	  watch times each call from its first advertisement to the connection
+	  of the phone, which reads it back: how fast a phone comes back in the
+	  background (risk R11, app/android probe, tools/cobalt_link.py trial).
+	  Never in the product.
+
+config CB91AI_WATCH_DEBUG_WRIST
+	bool "The wrist's tuning set by the PC harness (development)"
+	help
+	  Cobalt Link key 0x7C: the thresholds of the accelerometer for the
+	  raise of the wrist and the double tap (lot D4), read and set again
+	  at once, so that they are tuned at the wrist without a new image
+	  (tools/cobalt_link.py wrist). Never in the product.
+
+config CB91AI_WATCH_DEBUG_PASSKEY
+	int "A fixed pairing code for the bench (development), 0: drawn at random"
+	default 0
+	range 0 99999
+	help
+	  The code of a pairing, shown on the glass as always, fixed instead
+	  of drawn from the hardware generator: the PC of the bench pairs with
+	  no one to read the glass (tools/ble_pair.py, lot S2), then installs
+	  and tries a product image, whose SMP and Cobalt Link ask for the
+	  authenticated link. Never in the product: its code is drawn at
+	  random at every pairing, and read on the glass.
+
+config CB91AI_WATCH_NOTE_MAX_S
+	int "The longest take, in seconds"
+	default 120
+	range 10 300
+	help
+	  A take held past half a second shows "rEC" and runs on by itself
+	  until a press of ALARM (2026-09-24), 3 s after the last
+	  word, or this long. The voice goes straight to the 1 MB storage
+	  flash, about 8 min of LC3 at 16 kbit/s in all: the 15 s of EF-23
+	  came from the RAM of the V1. The watch keeps this much erased ahead
+	  of the notes (59 sectors of 4 KB for 120 s), hence the bound.
+
+config CB91AI_WATCH_CONFIRM_WAIT_S
+	int "How long an image in test waits for its confirmation, in seconds"
+	default 600
+	range 120 3600
+	help
+	  The watch never confirms itself: the host confirms a new image over
+	  SMP once it finds it running, which proves the way back works. An
+	  image still in test after this long reboots, and MCUboot starts the
+	  previous one again (src/update.c).
+
+source "Kconfig.zephyr"

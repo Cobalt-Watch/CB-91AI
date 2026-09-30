@@ -1,0 +1,16 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_CB91AI
+
+config HW_STACK_PROTECTION
+	default ARCH_HAS_STACK_PROTECTION
+
+if NORDIC_QSPI_NOR
+
+config NORDIC_QSPI_NOR_FLASH_LAYOUT_PAGE_SIZE
+	default 4096 if MCUBOOT || BOOTLOADER_MCUBOOT
+
+endif # NORDIC_QSPI_NOR
+
+endif # BOARD_CB91AI

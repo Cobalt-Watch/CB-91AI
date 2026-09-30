@@ -1,0 +1,16 @@
+# Reference sentences of lots K1 and K3 (2026-09-23): voice notes as a wearer would
+# dictate them, with the names, numbers, times and amounts where a codec or a
+# transcription goes wrong first. Read at the wrist, one per take of 6 s
+# (`cb91ai take <n>`, armed on ALARM): series A in a quiet room, series B with
+# noise around (radio or street). WAV files named k1-A1.wav ... k1-B5.wav are
+# compared with them by codec_eval.py.
+A1: Rappelle-moi d'appeler Sophie Martin demain à neuf heures quinze.
+A2: Acheter du pain, six œufs, du beurre et deux citrons.
+A3: Rendez-vous chez le dentiste mardi quatorze octobre à seize heures trente.
+A4: Envoyer le devis de mille deux cent cinquante euros à Julien.
+A5: Mettre à jour le firmware de la montre avant vendredi.
+B1: Réserver le train pour Lyon de dix-huit heures douze.
+B2: Récupérer le colis à la poste, douze rue des Lilas, avant midi.
+B3: Karim a changé de numéro, il finit par quarante-deux dix-huit.
+B4: Réunion avec l'équipe de Grenoble jeudi sur le budget du projet.
+B5: Arroser les plantes du balcon et sortir la poubelle jaune ce soir.

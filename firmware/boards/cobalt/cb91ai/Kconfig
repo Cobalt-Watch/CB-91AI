@@ -1,0 +1,20 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_CB91AI
+
+config CB91AI_PROVISION_UICR
+	bool "Program UICR at first boot (REGOUT0 = 3.0 V, debug port kept open)"
+	default y
+	help
+	  VDD of the nRF52840 is fed by the coin cell while VDDH is fed by USB.
+	  When USB is plugged the chip enters high voltage mode and REG0 drives
+	  the 3V rail at the voltage stored in UICR.REGOUT0, whose factory value
+	  is 1.8 V. This option programs REGOUT0 to 3.0 V and, on revision 3 or
+	  later dies only (build code F and up, hardened APPROTECT), sets
+	  UICR.APPROTECT to HwDisabled (0x5A) so that the SWD port stays open.
+	  On older dies (build codes up to D, legacy APPROTECT) UICR.APPROTECT
+	  is left erased, which is the only value keeping the port open there.
+	  The chip is reset once after programming.
+
+endif # BOARD_CB91AI

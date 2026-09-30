@@ -1,0 +1,10 @@
+# Drivers and building blocks shared by the bench self-test (firmware/app) and
+# the watch application (firmware/watch), as a Zephyr module so that both get
+# their sources, their Kconfig, their include path and the devicetree bindings
+# of the board's parts the same way.
+name: cb91ai_lib
+build:
+  cmake: .
+  kconfig: Kconfig
+settings:
+  dts_root: .

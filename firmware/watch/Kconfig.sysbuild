@@ -1,0 +1,21 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+#
+# Sysbuild configuration root of the CB-91AI firmware.
+#
+# The key that signs the images never lives in this repository (open source:
+# no secret here, ever). Its path comes from the environment:
+#
+#     set CB91AI_SIGNING_KEY=C:/Users/<you>/.cobalt/keys/cb91ai-signing-rsa2048.pem
+#
+# with forward slashes. MCUboot embeds the public half, and the application
+# image is signed with the private one. Without the variable, sysbuild falls
+# back to the development key shipped with MCUboot, which everyone has: fine to
+# try the code on a board of your own, refused by a watch that carries the
+# project bootloader. sysbuild.cmake says which key a build uses.
+
+config BOOT_SIGNATURE_KEY_FILE
+	string
+	default "$(CB91AI_SIGNING_KEY)" if "$(CB91AI_SIGNING_KEY)" != ""
+
+source "share/sysbuild/Kconfig"

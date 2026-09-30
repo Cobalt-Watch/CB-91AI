@@ -1,0 +1,16 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+
+CONFIG_ARM_MPU=y
+CONFIG_HW_STACK_PROTECTION=y
+
+CONFIG_GPIO=y
+CONFIG_PINCTRL=y
+CONFIG_REGULATOR=y
+
+# No UART pads on the board: console and logs go through Segger RTT
+CONFIG_SERIAL=n
+CONFIG_UART_CONSOLE=n
+CONFIG_USE_SEGGER_RTT=y
+CONFIG_RTT_CONSOLE=y
+CONFIG_CONSOLE=y

@@ -1,0 +1,26 @@
+# Cobalt Link, protocol version 1: test vectors (the Cobalt Link specification).
+# One message per line: its name, its bytes in hex, then its fields. Checked by the watch
+# (firmware/tests/host/test_link.c, lib/link_proto.c) and by the PC harness
+# (firmware/tools/cobalt_link.py --self-test). Computed field by field with struct.pack from
+# the tables of the document, not by either codec. Values in hex are raw bytes.
+HELLO 010101050002030002905f0100010b03c03869a6 version=1 reason=1 state=5 fw_major=0 fw_minor=2 fw_revision=3 notes=2 note_bytes=90000 battery_mv=2817 codecs=3 watch_id=2791913664
+NOTE_OFFER 020c000000c8af0000efbeadde id=12 size=45000 crc32=3735928559
+NOTE_DATA 0301020304 data=01020304
+NOTE_END 040c000000 id=12
+VALUE 05010018 key=1 status=0 value=18
+VALUE 0510002a000000760200005f000000070001000000 key=16 status=0 value=2a000000760200005f000000070001000000
+VALUE 057f01 key=127 status=1 value=
+VALUE 051200a11ab9c0fc030000027034b46a7f08570bc836b46abbfe238b key=18 status=0 value=a11ab9c0fc030000027034b46a7f08570bc836b46abbfe238b
+VALUE 057a00015700010c000000022a0700006a090000180000009001 key=122 status=0 value=015700010c000000022a0700006a090000180000009001
+EVENT 060202 gesture=2 button=2
+BYE_WATCH 0f01 reason=1
+TIME 81a041e8cfa00100007800 utc_ms=1790194500000 tz_minutes=120
+TIME 811b42e8cfa0010000d4fe utc_ms=1790194500123 tz_minutes=-300
+NOTE_ACCEPT 820c00000000100000 id=12 offset=4096
+NOTE_ACK 830c0000000014 id=12 verdict=0 window_s=20
+RESULT 840c00000001 id=12 code=1
+SET 850118 key=1 value=18
+SET 850304 key=3 value=04
+SET 8512fc030000 key=18 value=fc030000
+GET 8610 key=16
+BYE_PHONE 8f00 reason=0

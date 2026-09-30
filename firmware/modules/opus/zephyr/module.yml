@@ -1,0 +1,6 @@
+# Zephyr glue around libopus for the CB-91AI (lot K2). The sources of libopus
+# are not in this repository: see ../CMakeLists.txt.
+name: cb91ai_opus
+build:
+  cmake: .
+  kconfig: Kconfig

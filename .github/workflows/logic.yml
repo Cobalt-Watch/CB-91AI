@@ -1,0 +1,28 @@
+# The checks that need no Zephyr, at every push: the host tests of the pure
+# logic (gcc and the sanitizers), which end with the harness's self-test.
+
+name: Logic
+
+on:
+  push:
+    # Branches only: the tag of a release marks a commit already checked on main
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: logic-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  logic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Host tests of the pure logic, then the harness's self-test
+        run: make -C firmware/tests/host

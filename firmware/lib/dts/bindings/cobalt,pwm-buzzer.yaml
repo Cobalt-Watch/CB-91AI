@@ -1,0 +1,14 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+
+description: Magnetic or piezo buzzer driven by a PWM output through a transistor
+
+compatible: "cobalt,pwm-buzzer"
+
+include: base.yaml
+
+properties:
+  pwms:
+    type: phandle-array
+    required: true
+    description: PWM channel driving the buzzer. The period sets the tone.

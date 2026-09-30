@@ -1,0 +1,41 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+
+config CB91AI_OPUS
+	bool "Opus encoder (libopus, fixed point)"
+	help
+	  Builds libopus for the watch: fixed point (no FPU needed), no float
+	  API, scratch memory on the stack of the calling thread. The decoder
+	  is compiled too, and dropped by the linker when nothing calls it.
+
+	  The sources of libopus (BSD licence) are not in this repository.
+	  Clone https://github.com/xiph/opus (tag v1.5.2) and say where it is
+	  with the CB91AI_OPUS_DIR environment variable or CMake variable;
+	  default: modules/lib/opus of the west workspace.
+
+if CB91AI_OPUS
+
+config CB91AI_OPUS_ARM_INLINE_ASM
+	bool "ARMv7E-M inline assembly of libopus (DSP multiplies)"
+	default y
+	help
+	  OPUS_ARM_INLINE_ASM, _EDSP and _MEDIA: the 16 x 32 and 16 x 16
+	  multiplies of the fixed-point code become SMULWB, SMLAWB and the
+	  like, saturation becomes SSAT, all of which the Cortex-M4 has. The
+	  separate ARM assembly files of libopus are for A-profile cores and
+	  are not built. Same output, bit for bit, as the C code (the bench
+	  prints a CRC of the encoded stream to check it).
+
+choice CB91AI_OPUS_OPTIMIZATION
+	prompt "Compiler optimization of libopus"
+	default CB91AI_OPUS_O2
+
+config CB91AI_OPUS_O2
+	bool "-O2: speed"
+
+config CB91AI_OPUS_OS
+	bool "-Os: size"
+
+endchoice
+
+endif # CB91AI_OPUS

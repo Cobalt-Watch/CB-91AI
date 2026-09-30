@@ -1,0 +1,27 @@
+# The Zephyr workspace of the CI (lot A5, .github/workflows/build.yml): Zephyr
+# v4.4.2, the version of the bench PC, and only the modules the images use
+# (their zephyr_modules.txt). The bench PC does not use this file: it builds
+# from its own workspace. A new module in an image
+# goes into the list below as well.
+#
+#   west init -l firmware && west update -o=--depth=1 -n
+#
+# libopus, for the codec bench images only (firmware/modules/opus), is not
+# here: the CI builds the default images.
+
+manifest:
+  projects:
+    - name: zephyr
+      url: https://github.com/zephyrproject-rtos/zephyr
+      revision: v4.4.2
+      import:
+        name-allowlist:
+          - cmsis
+          - cmsis_6
+          - hal_nordic
+          - liblc3
+          - mbedtls
+          - mcuboot
+          - segger
+          - tf-psa-crypto
+          - zcbor

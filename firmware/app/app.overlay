@@ -1,0 +1,27 @@
+/*
+ * Copyright (c) 2026 COBALT Technologies
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Self-test application overlay: two USB CDC-ACM ports. The first carries a
+ * second shell instance (the RTT one stays) and the logs, the second carries
+ * the MCUmgr SMP transport used for firmware updates through MCUboot. Both
+ * work from a plain COM port, without the debug probe.
+ */
+
+/ {
+	chosen {
+		zephyr,shell-uart = &cdc_acm_uart0;
+		zephyr,uart-mcumgr = &cdc_acm_uart1;
+	};
+};
+
+&zephyr_udc0 {
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+
+	cdc_acm_uart1: cdc_acm_uart1 {
+		compatible = "zephyr,cdc-acm-uart";
+		hw-flow-control;
+	};
+};

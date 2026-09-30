@@ -1,0 +1,365 @@
+/*
+ * Copyright (c) 2026 COBALT Technologies
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * COBALT CB-91AI: nRF52840 based replacement board for the Casio F-91W.
+ */
+
+/dts-v1/;
+#include <nordic/nrf52840_qiaa.dtsi>
+#include "cb91ai-pinctrl.dtsi"
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/adc/nrf-adc.h>
+#include <zephyr/dt-bindings/gpio/nordic-nrf-gpio.h>
+#include <zephyr/dt-bindings/i2c/i2c.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
+#include <zephyr/dt-bindings/regulator/nrf5x.h>
+
+/ {
+	model = "COBALT CB-91AI";
+	compatible = "cobalt,cb91ai";
+
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,ieee802154 = &ieee802154;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		led_red: led_0 {
+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+			label = "Red LED";
+		};
+		led_green: led_1 {
+			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+			label = "Green LED";
+		};
+		led_blue: led_2 {
+			gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+			label = "Blue LED";
+		};
+	};
+
+	pwmleds {
+		compatible = "pwm-leds";
+		pwm_led_red: pwm_led_0 {
+			pwms = <&pwm0 0 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			label = "Red PWM LED";
+		};
+		pwm_led_green: pwm_led_1 {
+			pwms = <&pwm0 1 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			label = "Green PWM LED";
+		};
+		pwm_led_blue: pwm_led_2 {
+			pwms = <&pwm0 2 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			label = "Blue PWM LED";
+		};
+	};
+
+	buzzer: buzzer {
+		compatible = "cobalt,pwm-buzzer";
+		pwms = <&pwm1 0 PWM_USEC(250) PWM_POLARITY_NORMAL>;
+		status = "okay";
+	};
+
+	/* Case buttons: a press connects the input to the metal frame of the
+	 * module, which carries the battery + (measured on the cell, 2026-09-22,
+	 * V2-22): internal pull-down, active high. Without a cell the frame is not
+	 * at the battery potential and the buttons read nothing; the reading of
+	 * 2026-09-16 (frame at GND) was taken that way, on USB with no cell. A
+	 * series resistor per input is planned for V2 (V2-12).
+	 */
+	buttons {
+		compatible = "gpio-keys";
+		button_light: button_0 {
+			gpios = <&gpio1 9 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+			label = "LIGHT";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+		button_mode: button_1 {
+			gpios = <&gpio0 12 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+			label = "MODE";
+			zephyr,code = <INPUT_KEY_1>;
+		};
+		button_alarm: button_2 {
+			gpios = <&gpio1 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+			label = "ALARM";
+			zephyr,code = <INPUT_KEY_2>;
+		};
+	};
+
+	/* Microphone supply switched by P1.01 (770 uA, high drive output) */
+	mic_pwr: mic-pwr {
+		compatible = "regulator-fixed";
+		regulator-name = "mic-vdd";
+		enable-gpios = <&gpio1 1 (GPIO_ACTIVE_HIGH | NRF_GPIO_DRIVE_H0H1)>;
+		startup-delay-us = <10000>;
+	};
+
+	/* Battery: 1M / 510k divider on AIN6, V_AIN6 = V_bat * 510 / 1510 */
+	zephyr,user {
+		/* 0: battery node on AIN6, 1: VDD rail, 2: VDDH / 5 (USB 5 V) */
+		io-channels = <&adc 6>, <&adc 1>, <&adc 2>;
+		vbat-divider = <510 1510>;
+	};
+
+	/*
+	 * Last 256 bytes of the RAM, taken away from the linker (sram0 is shortened
+	 * below, for MCUboot as well): what has to survive a soft reset or a
+	 * firmware update sits here at a fixed address, whatever the image. The
+	 * RAM is never cleared, but a watchdog bite or a pin reset may corrupt it
+	 * (nRF52840 PS v1.11, reset behavior, p. 90): each retention area carries a
+	 * prefix and a CRC, so RAM left undefined by a power-on or corrupted by a
+	 * reset is never taken for data. First user: the wall clock (src/clock.c).
+	 */
+	sram@2003ff00 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x2003ff00 0x100>;
+		zephyr,memory-region = "RetainedMem";
+		status = "okay";
+
+		retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			clock_retention: retention@0 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x0 0x20>;
+				prefix = [c1 0c];
+				checksum = <4>;
+			};
+
+			/* The boots and the watchdog bites (EF-72), counted at
+			 * once, before the settings keep them: a watch that
+			 * reboots in a loop is counted too (watch/src/counters.c) */
+			counters_retention: retention@20 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x20 0x20>;
+				prefix = [c0 57];
+				checksum = <4>;
+			};
+
+			/* The last reading of the cell at rest: after a reset
+			 * (an update, a bite), the boot would read it sagging
+			 * from what came before (watch/src/main.c) */
+			cell_retention: retention@40 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x40 0x20>;
+				prefix = [ce 11];
+				checksum = <4>;
+			};
+		};
+	};
+
+	aliases {
+		led0 = &led_green;
+		led1 = &led_red;
+		led2 = &led_blue;
+		pwm-led0 = &pwm_led_green;
+		sw0 = &button_mode;
+		sw1 = &button_light;
+		sw2 = &button_alarm;
+		watchdog0 = &wdt0;
+		spi-flash0 = &zd25wq80c;
+		accel0 = &bma400;
+	};
+};
+
+&sram0 {
+	/* 256 kB minus the retained area above */
+	reg = <0x20000000 0x3ff00>;
+};
+
+&reg1 {
+	/* L4 (10 uH) is present on DCC: REG1 can run in DC/DC mode */
+	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
+};
+
+&uicr {
+	/* P0.18 is the reset button (U108) */
+	gpio-as-nreset;
+};
+
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@6 {
+		reg = <6>;
+		zephyr,gain = "ADC_GAIN_1_2";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		/* 338k source impedance: 40 us acquisition (Nordic table) */
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)>;
+		zephyr,input-positive = <NRF_SAADC_AIN6>;
+		zephyr,resolution = <12>;
+		zephyr,oversampling = <4>;
+	};
+
+	/* Internal inputs: VDD is the 3V rail, VDDH / 5 the USB 5 V (0 V on battery) */
+	channel@1 {
+		reg = <1>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,input-positive = <NRF_SAADC_VDD>;
+		zephyr,resolution = <12>;
+		zephyr,oversampling = <4>;
+	};
+
+	channel@2 {
+		reg = <2>;
+		zephyr,gain = "ADC_GAIN_1_2";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,input-positive = <NRF_SAADC_VDDHDIV5>;
+		zephyr,resolution = <12>;
+		zephyr,oversampling = <4>;
+	};
+};
+
+&gpiote {
+	status = "okay";
+};
+
+/* Edge interrupts through the SENSE mechanism (PORT event) on every pin: no
+ * GPIOTE IN channel, which keeps a clock running and costs tens of uA. The
+ * case buttons wake the firmware this way.
+ */
+&gpio0 {
+	status = "okay";
+	sense-edge-mask = <0xffffffff>;
+};
+
+&gpio1 {
+	status = "okay";
+	sense-edge-mask = <0xffffffff>;
+};
+
+&i2c0 {
+	compatible = "nordic,nrf-twim";
+	status = "okay";
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-1 = <&i2c0_sleep>;
+	pinctrl-names = "default", "sleep";
+	clock-frequency = <I2C_BITRATE_FAST>;
+
+	/* Bosch BMA400, SDO tied to ground: address 0x14, CSB high: I2C mode */
+	bma400: bma400@14 {
+		compatible = "bosch,bma400";
+		reg = <0x14>;
+		int1-gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+		int2-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&spi1 {
+	compatible = "nordic,nrf-spim";
+	status = "okay";
+	pinctrl-0 = <&spi1_default>;
+	pinctrl-1 = <&spi1_sleep>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+
+	/* ROHM BU97930 segment LCD driver, 3 COM x 24 SEG used */
+	lcd: bu97930@0 {
+		compatible = "rohm,bu97930";
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+	};
+};
+
+&pwm0 {
+	status = "okay";
+	pinctrl-0 = <&pwm0_default>;
+	pinctrl-1 = <&pwm0_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&pwm1 {
+	status = "okay";
+	pinctrl-0 = <&pwm1_default>;
+	pinctrl-1 = <&pwm1_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&pdm0 {
+	status = "okay";
+	pinctrl-0 = <&pdm0_default>;
+	pinctrl-1 = <&pdm0_sleep>;
+	pinctrl-names = "default", "sleep";
+	clock-source = "PCLK32M_HFXO";
+};
+
+&qspi {
+	status = "okay";
+	pinctrl-0 = <&qspi_default>;
+	pinctrl-1 = <&qspi_sleep>;
+	pinctrl-names = "default", "sleep";
+
+	/*
+	 * Zetta ZD25WQ80C, 8 Mbit, 1.65 V to 3.6 V. Its JEDEC ID is ba 40 14,
+	 * as read on the V1 board on 2026-09-15 and as given in the ZD25WQ80C
+	 * datasheet; ba 60 14 is the ID of the 2.7 V ZD25Q80C. Single-line read
+	 * and program until the quad-enable procedure is confirmed on the board
+	 * (V2-27).
+	 */
+	zd25wq80c: zd25wq80c@0 {
+		compatible = "nordic,qspi-nor";
+		reg = <0>;
+		/* Quad I/O: QE is bit 1 of status register 2, written with 31H */
+		quad-enable-requirements = "S2B1v6";
+		writeoc = "pp4o";
+		readoc = "read4io";
+		sck-frequency = <8000000>;
+		jedec-id = [ba 40 14];
+		size = <8388608>;
+		has-dpd;
+		t-enter-dpd = <3000>;
+		t-exit-dpd = <30000>;
+		/* With CONFIG_PM_DEVICE_RUNTIME: deep power-down whenever idle (EF-52) */
+		zephyr,pm-device-runtime-auto;
+	};
+};
+
+&ieee802154 {
+	status = "okay";
+};
+
+zephyr_udc0: &usbd {
+	compatible = "nordic,nrf-usbd";
+	status = "okay";
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0x0000C000>;
+		};
+		slot0_partition: partition@c000 {
+			label = "image-0";
+			reg = <0x0000C000 0x00072000>;
+		};
+		slot1_partition: partition@7e000 {
+			label = "image-1";
+			reg = <0x0007E000 0x00072000>;
+		};
+		storage_partition: partition@f0000 {
+			label = "storage";
+			reg = <0x000F0000 0x00010000>;
+		};
+	};
+};

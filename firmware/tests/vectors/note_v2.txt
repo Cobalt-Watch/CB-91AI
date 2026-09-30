@@ -1,0 +1,9 @@
+# Voice note container v2: test vectors (the Cobalt Link specification).
+# One item per line: its kind, its bytes in hex, then its fields. Checked by the watch
+# (firmware/tests/host/test_note.c, lib/note.c) and by the PC harness
+# (firmware/tools/cobalt_link.py --self-test). Computed byte by byte with struct.pack and
+# zlib.crc32 from the table of the document, not by either side's code.
+# HEADER: the 64 bytes of a header. NOTE: a whole note as NOTE_DATA carries it, header and
+# three LC3 frames of 20 bytes, with the size and CRC32 that NOTE_OFFER announces.
+HEADER 43424e32014001012a000000803e000010271400803e0000bb23aed3a0010000780011003e1c00007c38000078563412fd320002020000003e6146ebffffffff id=42 utc_ms=1790257800123 tz_minutes=120 time_approx=1 end=1 duration_ms=7230 data_size=14460 data_crc=305419896 gain_db=-3 high_pass_hz=50 fw=0.2.2 state=255
+NOTE 43424e320140010107000000803e000010271400803e00000000000000000000000000001e0000003c000000ed7e36c90032000201000000dee1c246ffffffff0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92 id=7 size=124 crc32=1468073345

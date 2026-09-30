@@ -1,0 +1,57 @@
+# Copyright (c) 2026 COBALT Technologies
+# SPDX-License-Identifier: Apache-2.0
+#
+# Behaviour of the bench self-test. What it shares with the watch application
+# (drivers, wall clock) is in firmware/lib/Kconfig.
+
+config CB91AI_CODEC_BENCH
+	bool "Codec bench: flash, RAM and CPU cost of the speech codecs (lot K2)"
+	select INIT_STACKS
+	select THREAD_STACK_INFO
+	help
+	  Adds `cb91ai codec ...` (src/codec_bench.c): a couple of seconds of
+	  16 kHz speech, synthetic or from the microphone, encoded by each codec
+	  built in, with the CPU cycles of every frame (DWT), the size of the
+	  encoder state and the stack it really used. IMA ADPCM is always there
+	  as a reference; LC3 comes with CONFIG_LIBLC3, Opus with
+	  CONFIG_CB91AI_OPUS. A bench image, not a product one: build it with
+	  -DEXTRA_CONF_FILE=bench_codec.conf.
+
+if CB91AI_CODEC_BENCH
+
+config CB91AI_CODEC_BENCH_MS
+	int "Speech held in RAM for the bench, in milliseconds"
+	default 2000
+	range 500 4000
+	help
+	  32 bytes of RAM per millisecond.
+
+config CB91AI_CODEC_BENCH_STACK_SIZE
+	int "Stack of the encoder thread, in bytes"
+	default 16384
+	help
+	  Generous on purpose: the bench reports how much of it the encoder
+	  used, which is the figure to give the product thread.
+
+config CB91AI_CODEC_BENCH_OPUS_STATE_SIZE
+	int "Room for the state of the Opus encoder, in bytes"
+	depends on CB91AI_OPUS
+	default 40960
+	help
+	  opus_encoder_get_size() is only known at run time; the bench prints
+	  it, and refuses to run when this room is too small.
+
+endif # CB91AI_CODEC_BENCH
+
+config CB91AI_REC_MS
+	int "Voice capture held in RAM for `cb91ai rec`, in milliseconds"
+	default 0 if CB91AI_CODEC_BENCH
+	default 3200
+	range 0 4000
+	help
+	  src/hwtest.c: a capture from the microphone, sent to the PC over
+	  Bluetooth by tools/ble_shell.py --wav, for a board sealed in its watch.
+	  32 bytes of RAM per millisecond; 0 leaves the command out. The codec
+	  bench keeps its own buffer (CB91AI_CODEC_BENCH_MS), hence 0 there.
+
+source "Kconfig.zephyr"

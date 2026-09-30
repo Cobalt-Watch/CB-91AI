@@ -1,0 +1,78 @@
+# The three images built from scratch (lot A5), when the firmware changes: the
+# self-test, and the watch in debug.conf and in release.conf, with sysbuild
+# (MCUboot and the two slot variants), in the workspace of firmware/west.yml.
+# Only on changes of what goes into an image (10 to 17 min with cold caches).
+#
+# No key in the CI: without CB91AI_SIGNING_KEY, sysbuild signs with MCUboot's
+# development key and says so in a warning. Nothing built here goes on a
+# watch, whose bootloader refuses that key.
+
+name: Build
+
+on:
+  push:
+    # Branches only: the tag of a release marks a commit already checked on main
+    branches: ["**"]
+    # What goes into an image; the documents, the PC tools, the host tests
+    # (logic.yml) and the prebuilt bootloader (sysbuild builds its own) do not
+    paths:
+      - "firmware/**"
+      - "!firmware/**/*.md"
+      - "!firmware/tools/**"
+      - "!firmware/tests/**"
+      - "!firmware/prebuilt/**"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Zephyr v4.4.2, its modules and the SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: firmware
+          toolchains: arm-zephyr-eabi
+
+      - name: MCUboot's signing tool
+        run: pip3 install -r bootloader/mcuboot/scripts/requirements.txt
+
+      - name: The self-test
+        run: >
+          west build --sysbuild -b cb91ai -s firmware/app -d build/app -p always --
+          -DBOARD_ROOT=$GITHUB_WORKSPACE/firmware
+
+      - name: The watch, development image (debug.conf)
+        run: >
+          west build --sysbuild -b cb91ai -s firmware/watch -d build/watch-debug -p always --
+          -DBOARD_ROOT=$GITHUB_WORKSPACE/firmware -DEXTRA_CONF_FILE=debug.conf
+
+      - name: The watch, product image (release.conf)
+        run: >
+          west build --sysbuild -b cb91ai -s firmware/watch -d build/watch-release -p always --
+          -DBOARD_ROOT=$GITHUB_WORKSPACE/firmware -DEXTRA_CONF_FILE=release.conf
+
+      - name: Sizes (ENF-09, ENF-10) and the SMP permission of each watch image
+        run: |
+          # The SDK the setup action unpacked, at the root of the workspace
+          # (gnu/arm-zephyr-eabi/bin since SDK 1.0: found, not assumed)
+          size=$(find zephyr-sdk -name arm-zephyr-eabi-size -type f | head -n 1)
+          test -n "$size"
+          for d in build/app/app build/watch-debug/watch build/watch-release/watch; do
+            echo "== $d"
+            "$size" "$d/zephyr/zephyr.elf"
+          done
+          # The development image keeps SMP open (never an image whose SMP
+          # needs a bond the PC lacks), the product asks for one
+          grep -q "^CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW=y" build/watch-debug/watch/zephyr/.config
+          grep -q "^CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN=y" build/watch-release/watch/zephyr/.config
